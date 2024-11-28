@@ -1,0 +1,6 @@
+[Unit]
+Description=Run check_chromium_versions
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/chromium-ci-trigger/check_chromium_versions.sh
