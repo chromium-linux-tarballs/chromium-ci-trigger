@@ -18,39 +18,40 @@ pushd "$(dirname "$0")" > /dev/null ||
 	(echo "Failed to enter script dir" | systemd-cat -t check_chromium_versions -p err && exit 1)
 
 channels=(stable beta dev)
-channels_updated=()
+channels_to_update=()
 for channel in "${channels[@]}"; do
 	# We could do something fancy but three webrequests is "fine" and the script was already laying around
 	version=$(./get_chromium_versions.py --channel ${channel})
 	if [ ! -f "${channel}" ]; then
 		echo "${channel}: File does not exist, creating" | systemd-cat -t check_chromium_versions -p info
 		echo "${version}" > "${channel}"
-		channels_updated+=("${channel}")
+		channels_to_update+=("${channel}")
 		continue
 	fi
 	if ! diff -q "${channel}" <(echo "${version}") > /dev/null; then
 		echo "${channel}: Version changed, updating file" | systemd-cat -t check_chromium_versions -p info
 		echo "${version}" > "${channel}"
-		echo "Firing repository_dispatch event" | systemd-cat -t check_chromium_versions -p info
-		if [[ ! -f ./GITHUB_TOKEN ]]; then
-			echo "No GitHub token found" | systemd-cat -t check_chromium_versions -p err
-			exit 1
-		fi
-		if ! curl -X POST -H "Accept: application/vnd.github.everest-preview+json" \
-			-H "Authorization: token $(cat ./GITHUB_TOKEN)" \
-			--data '{"event_type": "tag-chromium-versions"}' \
-			"https://api.github.com/repos/chromium-linux-tarballs/chromium-tarballs/dispatches"; then
-				echo "Failed to fire repository_dispatch event" | systemd-cat -t check_chromium_versions -p err
-		fi
-		channels_updated+=("${channel}")
+		channels_to_update+=("${channel}")
 	else
 		echo "${channel}: Version unchanged" | systemd-cat -t check_chromium_versions -p info
 	fi
 done
 
 echo "Chromium check complete" | systemd-cat -t check_chromium_versions -p info
-if [ ${#channels_updated[@]} -gt 0 ]; then
-	echo "Updated channels: ${channels_updated[*]}" | systemd-cat -t check_chromium_versions -p info
+if [ ${#channels_to_update[@]} -gt 0 ]; then
+	echo "Firing repository_dispatch event" | systemd-cat -t check_chromium_versions -p info
+	if [[ ! -f ./GITHUB_TOKEN ]]; then
+		echo "No GitHub token found" | systemd-cat -t check_chromium_versions -p err
+		exit 1
+	fi
+	if ! curl -X POST -H "Accept: application/vnd.github.everest-preview+json" \
+		-H "Authorization: token $(cat ./GITHUB_TOKEN)" \
+		--data '{"event_type": "tag-chromium-versions"}' \
+		"https://api.github.com/repos/chromium-linux-tarballs/chromium-tarballs/dispatches"; then
+			echo "Failed to fire repository_dispatch event" | systemd-cat -t check_chromium_versions -p err
+	else
+		echo "Updated channels: ${channels_to_update[*]}" | systemd-cat -t check_chromium_versions -p info
+	fi
 else
 	echo "No channels updated" | systemd-cat -t check_chromium_versions -p info
 fi
