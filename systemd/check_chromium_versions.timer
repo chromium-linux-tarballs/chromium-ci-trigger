@@ -3,7 +3,8 @@ Description=Run check_chromium_versions on a schedule
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=30m
+OnUnitActiveSec=17m
+RandomizedDelaySec=5m
 
 [Install]
 WantedBy=timers.target
